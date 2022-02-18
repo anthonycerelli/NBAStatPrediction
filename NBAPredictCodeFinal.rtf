@@ -1,0 +1,223 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf500
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import pandas as pd\
+\
+raw_data = r"/Users/anthonycerelli/Desktop/programming/MachineLearning_NBA/old_data/Seasons_Stats.csv"\
+\
+df = pd.read_csv(raw_data)\
+\
+cols = df.columns.values\
+\
+for value in cols:\
+    \
+    df = df[df[value] != ""]\
+    df = df[df[value] != " "]\
+    df = df[df[value].notna()]\
+\
+df_finalized = pd.DataFrame()\
+df_finalized\
+\
+df = df[df['Year'] > 1979]\
+df['Player'] = df['Player'].str.replace('*', '')\
+\
+\
+year = 1980\
+df_finalized = pd.DataFrame()\
+\
+while year != max(df['Year']):\
+    print(str(year))\
+    df_temp = df[df['Year'] == year]\
+    del df_temp['PPG']\
+    del df_temp['RPG']\
+    del df_temp['APG']\
+    df_Repeats = df_temp[df_temp.groupby('Player').Player.transform(len)>1]\
+    df_temp = df_temp[df_temp.groupby('Player').Player.transform(len)==1]\
+    df_Repeats = df_Repeats[df_Repeats['Tm'] == 'TOT']\
+    df_final = pd.concat([df_temp, df_Repeats], ignore_index = True)\
+    df_temp_nextYear = df[df['Year'] == (year+1)]\
+    df_temp_nextYear = df_temp_nextYear[['Player', 'Tm','PPG', 'RPG', 'APG']]\
+    df_Repeats_nextYear = df_temp_nextYear[df_temp_nextYear.groupby('Player').Player.transform(len)>1]\
+    df_temp_nextYear = df_temp_nextYear[df_temp_nextYear.groupby('Player').Player.transform(len)==1]\
+    df_Repeats_nextYear = df_Repeats_nextYear[df_Repeats_nextYear['Tm'] == 'TOT']\
+    df_nextYear_final = pd.concat([df_temp_nextYear, df_Repeats_nextYear], ignore_index=True)\
+    del df_final['Tm']\
+    del df_nextYear_final['Tm']\
+    df_concat = df_final.merge(df_nextYear_final, 'left', on='Player')\
+    df_finalized = pd.concat([df_finalized, df_concat], ignore_index=True)\
+    year +=1\
+    \
+finalized_data = r"finalized_data"\
+df_finalized.to_csv(finalized_data, index=False)\
+\
+\
+#data analysis - using 2016 data for machine learning model, trying to predict PPG, RPG, and APG for 2017 season\
+import pandas as pd\
+from sklearn.preprocessing import StandardScaler\
+\
+df = pd.read_csv(finalized_data)\
+#data analysis -> average PPG: 9.62, average RPG: 4.01, average APG: 2.08\
+\
+del df['Player']\
+\
+#use one-hot encoding for Pos column. Everything else is nominal data and can be fed directly into model\
+\
+df = df[df['Pos'] != "PG-SG"]\
+df = df[df['Pos'] != "SF-SG"]\
+df = df[df['Pos'] != "C-PF"]\
+df = df[df['Pos'] != "SG-PG"]\
+df = df[df['Pos'] != "SG-SF"]\
+df = df[df['Pos'] != "PF-C"]\
+df = df[df['Pos'] != "SF-PF"]\
+df = df[df['Pos'] != "PF-SF"]\
+df = df[df['Pos'] != "SG-PF"]\
+df = df[df['Pos'] != "PG-SF"]\
+df = df[df['Pos'] != "C-SF"]\
+\
+df = df[df['G'] >= 60]\
+\
+cols = df.columns.values\
+\
+for value in cols:\
+    \
+    df = df[df[value] != ""]\
+    df = df[df[value] != " "]\
+    df = df[df[value].notna()]\
+\
+y_PPG = df['PPG']\
+y_RPG = df['RPG']\
+y_APG = df['APG']\
+\
+del df['PPG']\
+del df['RPG']\
+del df['APG']\
+\
+df = pd.get_dummies(df, columns = ['Pos']) #converts dataframe column Pos into one hot encoded columns\
+\
+\
+X = df\
+#X is the standalone input variables, where I am first going to test these values all against each variable\
+\
+#PPG model\
+from sklearn.model_selection import train_test_split\
+\
+X_train, X_test, y_train_PPG, y_test_PPG = train_test_split(X, y_PPG, test_size = 0.2, random_state=1)\
+\
+X_train, X_test, y_train_APG, y_test_APG = train_test_split(X, y_APG, test_size = 0.2, random_state=1)\
+\
+X_train, X_test, y_train_RPG, y_test_RPG = train_test_split(X, y_RPG, test_size = 0.2, random_state=1)\
+\
+y_test_PPG = y_test_PPG.to_numpy()\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+\
+\
+\
+#test different models\
+\
+#PPG model\
+\
+from sklearn.ensemble import RandomForestRegressor\
+\
+#RF model\
+model_rf = RandomForestRegressor(n_estimators=500, oob_score=True, random_state=100)\
+model_rf.fit(X_train, y_train_PPG) \
+pred_train_rf= model_rf.predict(X_train)\
+print(np.sqrt(mean_squared_error(y_train_PPG,pred_train_rf)))\
+print(r2_score(y_train_PPG, pred_train_rf))\
+\
+pred_test_rf = model_rf.predict(X_test)\
+print(np.sqrt(mean_squared_error(y_test_PPG,pred_test_rf)))\
+print(r2_score(y_test_PPG, pred_test_rf))\
+print(mean_absolute_error(y_test_PPG, pred_test_rf))\
+\
+\
+#PPG model\
+\
+from sklearn.linear_model import BayesianRidge\
+\
+#Bayesian ridge model\
+model_PPG = BayesianRidge(normalize=True)\
+model_PPG.fit(X_train, y_train_PPG)\
+y_pred_class = model_PPG.predict(X_test)\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+mae = mean_absolute_error(y_test_PPG, y_pred_class)\
+\
+print("mean absolute error: " + str(mae))\
+print(np.sqrt(mean_squared_error(y_test_PPG, y_pred_class)))\
+print(r2_score(y_test_PPG, y_pred_class))\
+\
+#APG model\
+\
+from sklearn.svm import SVR\
+\
+#support vector regression model \
+model_APG = SVR(C=100)\
+model_APG.fit(X_train, y_train_APG)\
+y_pred_class = model_APG.predict(X_test)\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+mae = mean_absolute_error(y_test_APG, y_pred_class)\
+\
+print("mean absolute error: " + str(mae))\
+print(r2_score(y_test_APG, y_pred_class))\
+print(np.sqrt(mean_squared_error(y_test_APG,y_pred_class)))\
+\
+#APG model\
+\
+from sklearn.linear_model import BayesianRidge\
+\
+#Bayesian Ridge Model\
+model_APG = BayesianRidge(normalize=True)\
+model_APG.fit(X_train, y_train_APG)\
+y_pred_class = model_APG.predict(X_test)\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+mae = mean_absolute_error(y_test_APG, y_pred_class)\
+\
+print("mean absolute error: " + str(mae))\
+print(np.sqrt(mean_squared_error(y_test_APG, y_pred_class)))\
+print(r2_score(y_test_APG, y_pred_class))\
+\
+#RPG model\
+\
+from sklearn.linear_model import Ridge\
+\
+#ridge model\
+model_RPG = Ridge()\
+model_RPG.fit(X_train, y_train_RPG)\
+y_pred_class = model_RPG.predict(X_test)\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+mae = mean_absolute_error(y_test_RPG, y_pred_class)\
+\
+print("mean absolute error: " + str(mae))\
+print(np.sqrt(mean_squared_error(y_test_RPG, y_pred_class)))\
+print(r2_score(y_test_RPG, y_pred_class))\
+\
+#RPG model\
+\
+from sklearn.linear_model import BayesianRidge\
+\
+#bayesian ridge model\
+model_RPG = BayesianRidge(normalize=True)\
+model_RPG.fit(X_train, y_train_RPG)\
+y_pred_class = model_RPG.predict(X_test)\
+\
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error\
+\
+mae = mean_absolute_error(y_test_RPG, y_pred_class)\
+\
+print("mean absolute error: " + str(mae))\
+print(np.sqrt(mean_squared_error(y_test_RPG, y_pred_class)))\
+print(r2_score(y_test_RPG, y_pred_class))}
